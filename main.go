@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 
+	"most-active-github-users-counter/merge"
 	"most-active-github-users-counter/output"
 	"most-active-github-users-counter/top"
 )
@@ -35,6 +36,7 @@ func main() {
 	fileName := flag.String("file", "", "Output file (optional, defaults to stdout)")
 	presetName := flag.String("preset", "", "Preset (optional)")
 	listPresets := flag.Bool("list-presets", false, "List all available presets as CSV and exit immediately")
+	mergeDir := flag.String("merge", "", "Merge regional YAML files from this directory into a global rating (optional)")
 
 	flag.Var(&locations, "location", "Location to query")
 	flag.Parse()
@@ -53,6 +55,25 @@ func main() {
 		excludeLocations = preset.exclude
 		presetTitle = PresetTitle(*presetName)
 		presetChecksum = PresetChecksum(*presetName)
+	}
+
+	if *mergeDir != "" {
+		if *outputOpt != "yaml" {
+			log.Fatal("Merging supports only yaml output")
+		}
+		mergeAmount := *amount
+		if mergeAmount > merge.MaxAmount {
+			log.Printf("Amount %v is too large for merging, using %v", mergeAmount, merge.MaxAmount)
+			mergeAmount = merge.MaxAmount
+		}
+		locations, err := merge.LoadDir(*mergeDir, merge.Slug)
+		if err != nil {
+			log.Fatal(err)
+		}
+		writeOutput(*fileName, func(writer *bufio.Writer) error {
+			return output.GlobalYamlOutput(merge.Merge(locations, mergeAmount), writer)
+		})
+		return
 	}
 
 	var format output.Format
@@ -74,9 +95,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	writeOutput(*fileName, func(writer *bufio.Writer) error {
+		return format(data, writer, opts)
+	})
+}
+
+func writeOutput(fileName string, write func(*bufio.Writer) error) {
 	var writer *bufio.Writer
-	if *fileName != "" {
-		f, err := os.Create(*fileName)
+	if fileName != "" {
+		f, err := os.Create(fileName)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -86,8 +113,7 @@ func main() {
 		writer = bufio.NewWriter(os.Stdout)
 	}
 
-	err = format(data, writer, opts)
-	if err != nil {
+	if err := write(writer); err != nil {
 		log.Fatal(err)
 	}
 	writer.Flush()

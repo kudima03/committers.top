@@ -12,6 +12,8 @@ It is expected to have the following environment variables defined:
 
 NOTE: two worker scripts are created (`user-badge`) and (`org-badge`) with different data embedded for both.
 
+The global rating (merged from all regions) is published as the `global` location, so its badges (`/global/LOGIN.svg`, `/global_public/LOGIN.svg`, `/global_private/LOGIN.svg`) work the same way as regional ones.
+
 ## One-time CloudFlare setup
 
 1. You need to add the domain to your CloudFlare account and enable the free Workers plan.
