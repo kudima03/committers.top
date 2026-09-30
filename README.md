@@ -18,6 +18,17 @@ go run *.go \
    --file ./output.csv
 ```
 
+**Global rating:**
+
+The global rating combines already generated regional results (no GitHub token or API requests needed). Users listed in several regions are counted once, and are ranked by contributions from the most recently generated region. Unlike the `worldwide` preset, which only considers the most followed users in the world, it includes everyone ranked in any region. It is limited to 256 users, as each regional list contains only the top 256 users of its region.
+
+```
+go run *.go \
+   --merge ./_data/locations \
+   --output yaml \
+   --file ./_data/locations/global.yml
+```
+
 ## Contribution
 
 Contributions are accepted. Please report issues or make pull requests against either `master` or [branch for the website](https://github.com/ashkulz/committers.top/tree/gh-pages) as appropriate.

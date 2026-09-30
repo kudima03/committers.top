@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"most-active-github-users-counter/github"
+	"most-active-github-users-counter/merge"
 	"most-active-github-users-counter/top"
 )
 
@@ -69,25 +70,7 @@ func YamlOutput(results github.GithubSearchResults, writer io.Writer, options to
 	users := GithubUserList(results.Users)
 	outputUsers := func(user []github.User, cs ContributionsSelector) {
 		for i, u := range user {
-			contributionCount := cs(u)
-			fmt.Fprintf(
-				writer,
-				`
-  - rank: %+v
-    name: %+v
-    login: %+v
-    avatarUrl: %+v
-    contributions: %+v
-    company: %+v
-    organizations: %+v
-`,
-				i+1,
-				strconv.QuoteToASCII(u.Name),
-				strconv.QuoteToASCII(u.Login),
-				u.AvatarURL,
-				contributionCount,
-				strconv.QuoteToASCII(u.Company),
-				strconv.QuoteToASCII(strings.Join(u.Organizations, ",")))
+			writeUser(writer, i+1, u, cs(u))
 		}
 	}
 
@@ -103,6 +86,72 @@ func YamlOutput(results github.GithubSearchResults, writer io.Writer, options to
 	fmt.Fprintln(writer, "\nprivate_users:")
 	outputUsers(topPrivate, selectContributions)
 
+	writeAllOrganizations(writer, topPublic, topContributions, topPrivate)
+
+	fmt.Fprintf(writer, "generated: %+v\n", time.Now().Format(time.RFC3339))
+	fmt.Fprintf(writer, "min_followers_required: %+v\n", results.MinimumFollowerCount)
+	fmt.Fprintf(writer, "total_user_count: %+v\n", results.TotalUserCount)
+
+	if options.PresetTitle != "" && options.PresetChecksum != "" {
+		fmt.Fprintf(writer, "title: %+v\n", options.PresetTitle)
+		fmt.Fprintf(writer, "definition_checksum: %+v\n", options.PresetChecksum)
+	}
+
+	return nil
+}
+
+func GlobalYamlOutput(result merge.Result, writer io.Writer) error {
+	outputUsers := func(users []merge.User) GithubUserList {
+		list := GithubUserList{}
+		for i, u := range users {
+			writeUser(writer, i+1, u.User, u.Contributions)
+			fmt.Fprintf(writer, "    regions: %+v\n", strconv.QuoteToASCII(strings.Join(u.Regions, ",")))
+			list = append(list, u.User)
+		}
+		return list
+	}
+
+	fmt.Fprintln(writer, "users:")
+	topPublic := outputUsers(result.Users)
+	fmt.Fprintln(writer, "users_public_contributions:")
+	topContributions := outputUsers(result.Public)
+	fmt.Fprintln(writer, "\nprivate_users:")
+	topPrivate := outputUsers(result.Private)
+
+	writeAllOrganizations(writer, topPublic, topContributions, topPrivate)
+
+	fmt.Fprintf(writer, "generated: %+v\n", time.Now().Format(time.RFC3339))
+	fmt.Fprintf(writer, "title: %+v\n", "Global")
+	fmt.Fprintf(writer, "region_count: %+v\n", result.RegionCount)
+	fmt.Fprintf(writer, "considered_user_count: %+v\n", result.ConsideredUsers)
+	fmt.Fprintf(writer, "oldest_region_data: %+v\n", result.OldestData.UTC().Format(time.RFC3339))
+	fmt.Fprintf(writer, "newest_region_data: %+v\n", result.NewestData.UTC().Format(time.RFC3339))
+
+	return nil
+}
+
+func writeUser(writer io.Writer, rank int, u github.User, contributionCount int) {
+	fmt.Fprintf(
+		writer,
+		`
+  - rank: %+v
+    name: %+v
+    login: %+v
+    avatarUrl: %+v
+    contributions: %+v
+    company: %+v
+    organizations: %+v
+`,
+		rank,
+		strconv.QuoteToASCII(u.Name),
+		strconv.QuoteToASCII(u.Login),
+		u.AvatarURL,
+		contributionCount,
+		strconv.QuoteToASCII(u.Company),
+		strconv.QuoteToASCII(strings.Join(u.Organizations, ",")))
+}
+
+func writeAllOrganizations(writer io.Writer, topPublic, topContributions, topPrivate GithubUserList) {
 	outputOrganizations := func(orgs Organizations) {
 		for i, org := range orgs {
 			fmt.Fprintf(
@@ -124,17 +173,6 @@ func YamlOutput(results github.GithubSearchResults, writer io.Writer, options to
 	outputOrganizations(topContributions.TopOrgs(10))
 	fmt.Fprintln(writer, "\nprivate_organizations:")
 	outputOrganizations(topPrivate.TopOrgs(10))
-
-	fmt.Fprintf(writer, "generated: %+v\n", time.Now().Format(time.RFC3339))
-	fmt.Fprintf(writer, "min_followers_required: %+v\n", results.MinimumFollowerCount)
-	fmt.Fprintf(writer, "total_user_count: %+v\n", results.TotalUserCount)
-
-	if options.PresetTitle != "" && options.PresetChecksum != "" {
-		fmt.Fprintf(writer, "title: %+v\n", options.PresetTitle)
-		fmt.Fprintf(writer, "definition_checksum: %+v\n", options.PresetChecksum)
-	}
-
-	return nil
 }
 
 var companyLogin = regexp.MustCompile(`^\@([a-zA-Z0-9]+)$`)
