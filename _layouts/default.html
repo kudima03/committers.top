@@ -70,12 +70,26 @@
             This list is generated with <a href="https://github.com/ashkulz/committers.top">this</a> piece of code.
             The logic is as follows (in pseudocode):
           </p>
+          {% if page.location == 'global' %}
+          <p><pre><code>regions.flatMap(_.users)
+       .distinctBy(_.login)
+       .sort(_.contributions)
+       .take(256)</code></pre>
+          </p>
+          <p>
+            Unlike the <a href="worldwide">Worldwide</a> list, which only considers the most followed GitHub users in the world,
+            this list combines the rankings of all countries/regions, so users with fewer followers are included as well.
+            Users listed in several regions are counted once, using the most recently generated region data
+            (regions were generated between <code>{{location.oldest_region_data}}</code> and <code>{{location.newest_region_data}}</code>).
+          </p>
+          {% else %}
           <p><pre><code>githubUsers.sort(_.followers){% if page.location != 'worldwide' %}
            .filter(_.location == '{{location.title}}') {% endif %}
            .take(1000)
            .sort(_.contributions)
            .take(256)</code></pre>
           </p>
+          {% endif %}
           <p>
           {% if page.mode == "commits" %}{% assign page_name = page.location %}
             This list contains all public commits for each user.
@@ -84,7 +98,11 @@
           {% else %}{% assign page_name = page.location | append: "_private" %}
             This list contains all contributions for each user (public & private).
           {% endif %}
+          {% if page.location == 'global' %}
+          This list combines <b>{{location.region_count}}</b> countries/regions with <b>{{location.considered_user_count}}</b> unique ranked users.
+          {% else %}
           There are <b>{{location.total_user_count}}</b> total users in the region and you need at least <b>{{location.min_followers_required}}</b> followers to be on this list.
+          {% endif %}
           </p>
           <p>
             Badges are also available, which you can include on your profile pages. Simply include the following markdown for users:
@@ -106,6 +124,7 @@
                 <th>Rank</th>
                 <th>User</th>
                 <th>Contribs</th>
+                {% if page.location == 'global' %}<th>Region</th>{% endif %}
                 <th>Picture</th>
               </tr>
             </thead>
@@ -124,6 +143,9 @@
               <td>{{user.rank}}.</td>
               <td><a href="https://github.com/{{user.login}}">{{user.login}}</a><br>({{user.name}})</td>
               <td>{{user.contributions}}</td>
+              {% if page.location == 'global' %}
+              <td class="regions">{% assign regions = user.regions | split: "," %}{% for region in regions %}<a href="{{region}}{% if page.mode == "contributions" %}_public{% elsif page.mode == "all" %}_private{% endif %}#{{user.login}}">{{site.data.locations[region].title | default: region}}</a>{% unless forloop.last %}<br>{% endunless %}{% endfor %}</td>
+              {% endif %}
               <td class="photo"><img data-src="{{user.avatarUrl}}&s=40" width="40" height="40" class="lazyload" alt="Avatar for {{user.login}}" /></td>
             </tr>
           {% endfor %}
